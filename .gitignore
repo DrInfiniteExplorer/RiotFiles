@@ -1,0 +1,25 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+
+*.opensdf
+*.vcxproj.user
+
+*.v12.suo
+
+#Intellisense database.
+*.sdf
+
+Debug/
+Release/
