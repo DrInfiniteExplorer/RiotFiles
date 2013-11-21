@@ -1,5 +1,6 @@
-#include "MMFile.h"
+#include "RiotFiles\MMFile.h"
 
+#define MMFenforce(cond, msg) if(!(cond)) { throw MMFileException((msg)); }
 
 MMFile::MMFile(const std::string &path, MMOpenMode mode, size_t sizeToMap)
 {

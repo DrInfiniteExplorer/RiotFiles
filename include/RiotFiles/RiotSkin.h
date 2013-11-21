@@ -149,8 +149,3 @@ public:
     void load(void* data, size_t length);
     void dispose();
 };
-
-RiotSkin* loadRiotSkin(const RiotArchiveFile* archive, const std::string& path);
-RiotSkeleton* loadRiotSkeleton(const RiotArchiveFile* archive, const std::string& path);
-RiotAnimation* loadRiotAnimation(const RiotArchiveFile* archive, const std::string& path);
-

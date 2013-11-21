@@ -95,7 +95,6 @@ public:
     RiotArchiveFileException(const std::string& msg) : runtime_error(msg) {}    
 };
 
-#define RAFenforce(cond, msg) if(!(cond)) { throw RiotArchiveFileException((msg)); }
 
 
 class RiotArchiveFile

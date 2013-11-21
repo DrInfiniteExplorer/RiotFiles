@@ -14,8 +14,6 @@ public:
     MMFileException(const std::string& msg) : runtime_error(msg) {}
 };
 
-#define MMFenforce(cond, msg) if(!(cond)) { throw MMFileException((msg)); }
-
 class MMFile
 {
     HANDLE fileHandle;

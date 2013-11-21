@@ -1,7 +1,9 @@
-#include "RiotArchiveFile.h"
+#include "RiotFiles\RiotArchiveFile.h"
+#include "RiotFiles\MMFile.h"
 
 #include "zlib\zlib.h"
-#include "MMFile.h"
+
+#define RAFenforce(cond, msg) if(!(cond)) { throw RiotArchiveFileException((msg)); }
 
 
 RiotArchiveFile::RiotArchiveFile(const std::string& path)

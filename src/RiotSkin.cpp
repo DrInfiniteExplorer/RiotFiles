@@ -1,6 +1,6 @@
-#include "RiotSkin.h"
+#include "RiotFiles\RiotSkin.h"
 
-#include "RiotArchiveFile.h"
+#include "RiotFiles\RiotArchiveFile.h"
 
 #include <iostream>
 #include <set>
@@ -74,14 +74,6 @@ void RiotSkin::dispose() {
     vertices.clear();
 }
 
-RiotSkin* loadRiotSkin(const RiotArchiveFile* archive, const std::string& path) {
-    auto fileId = archive->getFileIndex(path);
-    auto content = archive->getFileContents(fileId);
-
-    return new RiotSkin(content.data(), content.size());
-}
-
-
 void RiotSkeleton::load(void* data, size_t length) {
     dispose();
     char* ptr = (char*)data;
@@ -135,7 +127,7 @@ void RiotSkeleton::load(void* data, size_t length) {
         for (size_t idx = 0; idx < bones.size(); idx++) {
             const auto& bone = bones[idx];
             std::cout << "\t" << idx << " " << bone.mParentId << " " << bone.mName << " " << bone.mScale << std::endl;
-            SKLenforce(idx > size_t(bone.mParentId), "Bad parent relation found in SKL file");
+            SKLenforce(ptrdiff_t(idx) > bone.mParentId, "Bad parent relation found in SKL file");
         }
         std::cout << "SKL BoneIdCount: " << this->boneIds.size() << std::endl;
         for (size_t idx = 0; idx < boneIds.size(); idx++) {
@@ -193,15 +185,4 @@ void RiotAnimation::dispose() {
     bones.clear();
 }
 
-RiotSkeleton* loadRiotSkeleton(const RiotArchiveFile* archive, const std::string& path) {
-    auto fileId = archive->getFileIndex(path);
-    auto content = archive->getFileContents(fileId);
 
-    return new RiotSkeleton(content.data(), content.size());
-}
-
-RiotAnimation* loadRiotAnimation(const RiotArchiveFile* archive, const std::string& path) {
-    auto fileId = archive->getFileIndex(path);
-    auto content = archive->getFileContents(fileId);
-    return new RiotAnimation(content.data(), content.size());
-}
