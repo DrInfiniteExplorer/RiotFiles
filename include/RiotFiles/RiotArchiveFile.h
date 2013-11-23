@@ -4,6 +4,7 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <map>
 
 //#include "MMFile.h"
 
@@ -95,13 +96,11 @@ public:
     RiotArchiveFileException(const std::string& msg) : runtime_error(msg) {}    
 };
 
-
-
 class RiotArchiveFile
 {
     std::string path;
     std::unique_ptr<MMFile> directoryFile;
-    std::unique_ptr<MMFile> archiveFile;
+    mutable std::unique_ptr<MMFile> archiveFile;
 
     RAF::Header_t* header;
     RAF::TableOfContents_t* TOC;
@@ -109,27 +108,66 @@ class RiotArchiveFile
     RAF::FileListEntry_t* fileListEntries;
     StringTable::HEADER* stringListHeader;
     StringTable::ENTRY* stringListEntries;
-        
 
+protected:
+    RiotArchiveFile();
 public:
     RiotArchiveFile(const std::string& path);
-    ~RiotArchiveFile();
+    virtual ~RiotArchiveFile();
 
-    void dispose();
+    virtual void dispose();
 
-    size_t getFileCount() const {
+    //Closes the archive file (.dat) if open; opened by reading content of a file in the archive.
+    virtual void closeArchiveFile() const;
+
+    virtual size_t getFileCount() const {
         return fileListHeader->mCount;
     }
+    virtual size_t getStringCount() const {
+        return stringListHeader->m_Count;
+    }
 
-    std::string getFileName(size_t fileIdx) const;
-    std::string getString(size_t stringIdx) const;
+    virtual std::string getFileName(size_t fileIdx) const;
+    virtual std::string getString(size_t stringIdx) const;
 
-    bool hasFile(const std::string& path) const;
-    size_t getFileIndex(const std::string& path) const;
-    std::vector<char> getFileContents(size_t fileIdx) const;
+    virtual bool hasFile(const std::string& path) const;
+    virtual size_t getFileIndex(const std::string& path) const;
+    virtual std::vector<char> getFileContents(size_t fileIdx) const;
+
+    virtual void extractFile(size_t fileIdx, const std::string& outPath) const;
+    virtual void unpackArchive(const std::string& outPath) const;
 
 
 private:
     void load(const std::string& archivePath);
 };
 
+
+class RiotArchiveFileCollection : public RiotArchiveFile {
+    bool buildIndex;
+public:
+    RiotArchiveFileCollection(bool buildIndex);
+    virtual ~RiotArchiveFileCollection() { dispose(); }
+
+
+    virtual void dispose() override;
+
+    virtual void closeArchiveFile() const override;
+
+    virtual size_t getFileCount() const override;
+    virtual size_t getStringCount() const override;
+    virtual std::string getFileName(size_t fileIdx) const override;
+    virtual std::string getString(size_t stringIdx) const override;
+
+    virtual bool hasFile(const std::string& path) const override;
+    virtual size_t getFileIndex(const std::string& path) const override;
+    virtual std::vector<char> getFileContents(size_t fileIdx) const override;
+    virtual void extractFile(size_t fileIdx, const std::string& outPath) const override;
+    virtual void unpackArchive(const std::string& outPath) const override; // Tries to closeArchiveFile if cant map files.
+
+    void addArchive(const std::string& path);
+    std::map<std::string, RiotArchiveFile*> archivesNamed;
+    std::vector<RiotArchiveFile*> archives;
+    
+    void addArchive(RiotArchiveFile* archive); // Not implemented, not sure about how to handle ownership.
+};
