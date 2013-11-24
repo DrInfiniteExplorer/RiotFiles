@@ -91,6 +91,13 @@ namespace StringTable
     };
 }
 
+namespace RAF {
+    enum {
+        MinDirectorySize = sizeof(RAF::Header_t)+sizeof(RAF::TableOfContents_t)+sizeof(RAF::FileListHeader_t)+sizeof(StringTable::HEADER)
+    };
+}
+
+
 class RiotArchiveFileException : public std::runtime_error{
 public:
     RiotArchiveFileException(const std::string& msg) : runtime_error(msg) {}    
@@ -114,6 +121,9 @@ protected:
 public:
     RiotArchiveFile(const std::string& path);
     virtual ~RiotArchiveFile();
+
+    static void createEmptyFile(const std::string& path);
+    static bool couldBeRAF(const std::string& path);
 
     virtual void dispose();
 

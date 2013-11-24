@@ -27,6 +27,62 @@ RiotArchiveFile::~RiotArchiveFile()
 {
 }
 
+void RiotArchiveFile::createEmptyFile(const std::string& path) {
+    auto totalSize = sizeof(RAF::Header_t) + sizeof(RAF::TableOfContents_t) +
+        sizeof(RAF::FileListHeader_t) + sizeof(RAF::FileListEntry_t) + sizeof(StringTable::HEADER) + sizeof(StringTable::ENTRY);
+
+    std::unique_ptr<MMFile> newDir;
+    newDir.reset(new MMFile(path, MMOpenMode::readWrite, totalSize));
+
+    RAF::Header_t* header;
+    newDir->get(header, 0);
+
+    header->mMagic = RAF::MagicNumber;
+    header->mVersion = RAF::Version;
+
+    RAF::TableOfContents_t* TOC;
+    newDir->get(TOC, sizeof(RAF::Header_t));
+    TOC->mMgrIndex = 0; //? :P
+    TOC->mFileListOffset = sizeof(RAF::Header_t) + sizeof(RAF::TableOfContents_t);
+    TOC->mStringTableOffset = sizeof(RAF::Header_t) + sizeof(RAF::TableOfContents_t) + sizeof(RAF::FileListHeader_t) + sizeof(RAF::FileListEntry_t);
+    RAF::FileListHeader_t* fileHeader;
+    newDir->get(fileHeader, TOC->mFileListOffset);
+    fileHeader->mCount = 0;
+
+    StringTable::HEADER* stringHeader;
+    newDir->get(stringHeader, TOC->mStringTableOffset);
+    stringHeader->m_Count = 0;
+    stringHeader->m_Size = 0;
+
+    std::unique_ptr<MMFile> arcDir;
+    arcDir.reset(new MMFile(path + ".dat", MMOpenMode::readWrite, 1));
+}
+
+bool RiotArchiveFile::couldBeRAF(const std::string& path) {
+
+    WIN32_FILE_ATTRIBUTE_DATA fileData;
+    if (!GetFileAttributesEx(path.c_str(), GetFileExInfoStandard, &fileData)) {
+        return false;
+    }
+    if (__int64(fileData.nFileSizeLow) + __int64(fileData.nFileSizeHigh) < RAF::MinDirectorySize) {
+        return false;
+    }
+
+    std::unique_ptr<MMFile> directoryFile;
+    directoryFile.reset(new MMFile(path, MMOpenMode::read, 0));
+    RAF::Header_t* header;
+    directoryFile->get(header, 0);
+
+    if (header->mMagic != RAF::MagicNumber) {
+        return false;
+    }
+    if (header->mVersion != RAF::Version) {
+        return false;
+    }
+
+    return true;
+}
+
 
 void RiotArchiveFile::load(const std::string& archivePath)
 {
