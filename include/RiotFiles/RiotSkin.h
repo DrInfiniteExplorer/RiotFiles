@@ -107,9 +107,9 @@ public:
     std::vector<SKN::Vertex_t> vertices;
     SKN::EndData_t endData;
 
-    RiotSkin(void* data, size_t length) { load(data, length); }
+    RiotSkin(const void* data, size_t length) { load(data, length); }
     ~RiotSkin() { dispose(); }
-    void load(void* data, size_t length);
+    void load(const void* data, size_t length);
     void dispose();
 };
 
@@ -122,9 +122,9 @@ public:
     std::vector<SKL::Bone_t> bones;
     std::vector<int> boneIds; //Used in version 2
 
-    RiotSkeleton(void* data, size_t length) { load(data, length); }
+    RiotSkeleton(const void* data, size_t length) { load(data, length); }
     ~RiotSkeleton() { dispose(); }
-    void load(void* data, size_t length);
+    void load(const void* data, size_t length);
     void dispose();
 };
 
@@ -143,9 +143,9 @@ public:
 
     std::vector<Bone> bones;
 
-    RiotAnimation(void* data, size_t length) { load(data, length); }
+    RiotAnimation(const void* data, size_t length) { load(data, length); }
     ~RiotAnimation() { dispose(); }
 
-    void load(void* data, size_t length);
+    void load(const void* data, size_t length);
     void dispose();
 };

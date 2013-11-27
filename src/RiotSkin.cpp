@@ -7,7 +7,7 @@
 
 #define MemRead(X, Y)   (*(Y*)(X)); (X)+=sizeof(Y);
 
-void RiotSkin::load(void* data, size_t length) {
+void RiotSkin::load(const void* data, size_t length) {
     dispose();
     char* ptr = (char*)data;
     header = MemRead(ptr, SKN::Header_t);
@@ -74,7 +74,7 @@ void RiotSkin::dispose() {
     vertices.clear();
 }
 
-void RiotSkeleton::load(void* data, size_t length) {
+void RiotSkeleton::load(const void* data, size_t length) {
     dispose();
     char* ptr = (char*)data;
 
@@ -143,7 +143,7 @@ void RiotSkeleton::dispose() {
 }
 
 
-void RiotAnimation::load(void* data, size_t length) {
+void RiotAnimation::load(const void* data, size_t length) {
     char* ptr = (char*)data;
     header = MemRead(ptr, ANM::Header_t);
 

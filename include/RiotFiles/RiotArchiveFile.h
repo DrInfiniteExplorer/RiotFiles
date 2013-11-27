@@ -179,5 +179,5 @@ public:
     std::map<std::string, RiotArchiveFile*> archivesNamed;
     std::vector<RiotArchiveFile*> archives;
     
-    void addArchive(RiotArchiveFile* archive); // Not implemented, not sure about how to handle ownership.
+    //void addArchive(RiotArchiveFile* archive); // Not implemented, not sure about how to handle ownership.
 };

@@ -15,15 +15,26 @@ inline RiotSkin* loadRiotSkin(const RiotArchiveFile* archive, const std::string&
 
     return new RiotSkin(content.data(), content.size());
 }
+inline RiotSkin* loadRiotSkin(const std::vector<char>& content, const std::string& path) {
+    return new RiotSkin(content.data(), content.size());
+}
+
 inline RiotSkeleton* loadRiotSkeleton(const RiotArchiveFile* archive, const std::string& path) {
     auto fileId = archive->getFileIndex(path);
     auto content = archive->getFileContents(fileId);
 
     return new RiotSkeleton(content.data(), content.size());
 }
+inline RiotSkeleton* loadRiotSkeleton(const std::vector<char>& content, const std::string& path) {
+    return new RiotSkeleton(content.data(), content.size());
+}
+
 inline RiotAnimation* loadRiotAnimation(const RiotArchiveFile* archive, const std::string& path) {
     auto fileId = archive->getFileIndex(path);
     auto content = archive->getFileContents(fileId);
+    return new RiotAnimation(content.data(), content.size());
+}
+inline RiotAnimation* loadRiotAnimation(const std::vector<char>& content, const std::string& path) {
     return new RiotAnimation(content.data(), content.size());
 }
 
