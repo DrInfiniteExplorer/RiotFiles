@@ -13,6 +13,16 @@
 
 #define RAFenforce(cond, msg) if(!(cond)) { throw RiotArchiveFileException(std::string(__FILE__ " " STRINGIZE(__LINE__) ": ") + (msg)); }
 
+bool compare(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    for (unsigned int i = 0; i < a.size(); i++) {
+        if (tolower(a[i]) != tolower(b[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 RiotArchiveFile::RiotArchiveFile(){
 }
@@ -113,14 +123,12 @@ void RiotArchiveFile::load(const std::string& archivePath)
 }
 
 void RiotArchiveFile::dispose() {
-    directoryFile.reset();;
-    archiveFile.reset();;
+    directoryFile.reset();
+    archiveFile.reset();
 
 }
 
 void RiotArchiveFile::closeArchiveFile() const {
-    //std::cout << "Closing down archive file for " << path << std::endl;
-    //archiveFile->dispose();
     archiveFile.reset(nullptr);
 }
 
@@ -153,35 +161,50 @@ const std::string getZLibError(int error) {
     return "No no";
 }
 
-bool RiotArchiveFile::hasFile(const std::string& path) const {
+bool RiotArchiveFile::hasFile(const std::string& _path) const {
+    auto path = sanitize(_path);
     for (size_t i = 0; i < fileListHeader->mCount; i++) {
         auto name = getFileName(i);
-        if (path == name) {
+        if (compare(path, name)) {
             return true;
         }
     }
     return false;
 }
 
-size_t RiotArchiveFile::getFileIndex(const std::string& path) const {
+size_t RiotArchiveFile::getFileIndex(const std::string& _path) const {
+    // Can probably be accellerated by grabbing hash of path, looking
+    // in the fileheader until a match is found and then
+    // linearly search until found
+    auto path = sanitize(_path);
     for (size_t i = 0; i < fileListHeader->mCount; i++) {
         auto name = getFileName(i);
-        if (path == name) {
+        if (compare(path, name)) {
             return i;
         }
     }
     throw RiotArchiveFileException("Could not find file in archive: " + path);
 }
 
-std::vector<char> RiotArchiveFile::getFileContents(size_t fileIdx) const {
-    RAFenforce(fileIdx < fileListHeader->mCount, "Bad fileIdx supplied to getFileName");
-    auto entry = fileListEntries + fileIdx;
+size_t RiotArchiveFile::getFileSize(size_t fileIdx) const {
+    return fileListEntries[fileIdx].mSize;
+}
 
-
+void RiotArchiveFile::openArchive() const {
+    if (archiveFile) {
+        return;
+    }
     auto arcPath = path + ".dat";
     WIN32_FILE_ATTRIBUTE_DATA arcData;
     RAFenforce(GetFileAttributesEx(arcPath.c_str(), GetFileExInfoStandard, &arcData), "Could not obtain size of .dat file!" + arcPath);
     archiveFile.reset(new MMFile(arcPath, MMOpenMode::read, 0));
+}
+
+std::vector<char> RiotArchiveFile::getFileContents(size_t fileIdx) const {
+    RAFenforce(fileIdx < fileListHeader->mCount, "Bad fileIdx supplied to getFileName");
+    auto entry = fileListEntries + fileIdx;
+
+    openArchive();
 
     byte* srcPtr;
     archiveFile->get(srcPtr, entry->mOffset);
@@ -244,6 +267,271 @@ void RiotArchiveFile::unpackArchive(const std::string& outPath) const {
         this->extractFile(fileIdx, outPath + "\\" + fileName);
     }
 }
+
+
+std::string RiotArchiveFile::sanitize(const std::string& _path) {
+    auto path = _path;
+    std::replace(path.begin(), path.end(), '\\', '/');
+    if (path[0] == '/') return path;
+    return "/" + path;
+}
+
+unsigned int RiotArchiveFile::hashString(std::string str) {
+    unsigned int hash = 0;
+    unsigned int tmp;
+    for (auto ch : str) {
+        hash = (hash << 4) + tolower(ch);
+        tmp = hash & 0xf0000000;
+        if (tmp) {
+            hash = hash ^ (tmp >> 24);
+            hash = hash ^tmp;
+        }
+    }
+    return hash;
+}
+
+
+void RiotArchiveFile::removeFile(const std::string& _archivePath) {
+    auto archivePath = sanitize(_archivePath);
+    for (const auto& it : addList) {
+        if (compare(it.first, archivePath)) {
+            addList.erase(it.first);
+            break;
+        }
+    }
+    for (const auto& item : removeList) {
+        if (compare(item, archivePath)) {
+            return;
+        }
+    }
+
+    if (!hasFile(archivePath)) {
+        return;
+    }
+    removeList.insert(archivePath);
+}
+
+void RiotArchiveFile::addFile(const std::string& _archivePath, const std::string& filePath) {
+    auto archivePath = sanitize(_archivePath);
+    removeFile(archivePath);
+    addList[archivePath] = AddInfo{ filePath, archivePath };
+}
+
+
+unsigned int compress(const std::string& filePath, FILE* out) {
+    auto inFile = new MMFile(filePath, MMOpenMode::read, 0);
+    char* data = (char*)inFile->getPtr();
+    z_stream stream;
+    ZeroMemory(&stream, sizeof(stream));
+    deflateInit(&stream, 9);
+    
+    stream.avail_in = (unsigned int)inFile->getSize();
+    stream.next_in = (Bytef*)data;
+    char buff[4000];
+    unsigned int written = 0;
+    do {
+        stream.avail_out = sizeof(buff);
+        stream.next_out = (Bytef*)buff;
+        auto err = deflate(&stream, Z_FINISH);
+        if (err && err != Z_STREAM_END) {
+            //throw new ZlibException(err);
+            throw new RiotArchiveFileException("Error in deflate: " + getZLibError(err));
+        }
+        int toWrite = sizeof(buff) - stream.avail_out;
+        fwrite(buff, 1, toWrite, out);
+        written += toWrite;
+    } while (stream.avail_out == 0);
+
+    deflateEnd(&stream);
+    delete inFile;
+    return written;
+}
+
+
+
+// Load old file
+// for each in old file:
+//   If not removed:
+//      Copy file and make new offsets, add to list of things
+// 
+// For each new file:
+//   Compress
+//   Add offsets to list of things
+//
+// Sort list of things
+// Also weirdness checks?
+//
+// Make new directory
+
+
+
+
+void RiotArchiveFile::apply() {
+    if (addList.empty() && removeList.empty()) {
+        return;
+    }
+
+    openArchive();
+
+    //int fileCountDiff = (int)addList.size() - (int)removeList.size();
+    //unsigned int finalFileCount = fileListHeader->mCount + fileCountDiff;
+
+    std::set<unsigned int> toRemoveId;
+    for(const auto& removePath : removeList) {
+        auto fileIndex = getFileIndex(removePath);
+        toRemoveId.insert((unsigned int)fileIndex);
+    }
+
+
+    FILE* archiveOut = nullptr;
+    fopen_s(&archiveOut, (path + ".tmp.dat").c_str(), "wb");
+    RAFenforce(archiveOut, "Could not create file:" + (path + ".tmp.dat"));
+
+    std::vector<NewFileEntry> newArchiveFiles;
+    for (unsigned int fileIdx = 0; fileIdx < fileListHeader->mCount; fileIdx++) {
+        if (toRemoveId.find(fileIdx) != toRemoveId.end()) {
+            continue;
+        }
+        auto onlyEarlier = [&](unsigned int a[2]) {
+            return a[0] < fileListEntries[fileIdx].mOffset;
+        };
+
+        RAF::FileListEntry_t entry = fileListEntries[fileIdx];
+
+        if (entry.mSize) {
+            auto size = entry.mSize;
+            auto src = (char*)archiveFile->getPtr() + entry.mOffset;
+            auto offset = ftell(archiveOut);
+            fwrite(src, 1, size, archiveOut);
+            auto archivePath = getFileName(fileIdx);
+
+            auto entry = NewFileEntry(archivePath);
+            entry.offset = offset;
+            entry.size = size;
+            newArchiveFiles.push_back(entry);
+        }
+    }
+
+    for (auto& toAdd : addList) {
+        auto offset = ftell(archiveOut);
+        auto sourcePath = toAdd.second.sourcePath;
+        auto size = compress(sourcePath, archiveOut);
+
+        auto entry = NewFileEntry(toAdd.second.archivePath);
+        entry.offset = offset;
+        entry.size = size;
+        newArchiveFiles.push_back(entry);
+    }
+
+    auto sortByHash = [](const NewFileEntry& a, const NewFileEntry& b) {
+        if (a.hash < b.hash) { return true; }
+        else if (a.hash == b.hash) { return a.archivePath < b.archivePath; }
+        return false;
+    };
+    std::sort(newArchiveFiles.begin(), newArchiveFiles.end(), sortByHash);
+
+
+    // Now make directory file!
+
+    auto exists = [](const std::string& path) {
+        auto attribs = GetFileAttributes(path.c_str());
+        return attribs != INVALID_FILE_ATTRIBUTES;
+    };
+    auto remove = [](const std::string& path) {
+        DeleteFileA(path.c_str());
+    };
+    auto rename = [&](const std::string& from, const std::string& to) {
+        RAFenforce(exists(from), "Cant rename file, does not exist: " + from);
+        RAFenforce(MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING), "Could not rename file " + from + " to " + to);
+    };
+
+    FILE* outFile = nullptr;
+    fopen_s(&outFile, (path + ".tmp").c_str(), "wb");
+    fwrite(header, sizeof(*header), 1, outFile);
+
+    // Later fseek to sizeof(RAF::Header_t) and write real TOC
+    fwrite(TOC, sizeof(*TOC), 1, outFile);
+
+    auto disc = std::string("RAF File created by RAF Packer for Total Commander");
+    fwrite(disc.c_str(), 1, disc.size(), outFile);
+
+    auto fileHeaderOffset = ftell(outFile);
+
+    RAF::FileListHeader_t flHeader;
+    flHeader.mCount = (unsigned long) newArchiveFiles.size();
+    fwrite(&flHeader, sizeof(flHeader), 1, outFile);
+
+    for (unsigned int fileIdx = 0; fileIdx < newArchiveFiles.size(); fileIdx++) {
+        const auto& file = newArchiveFiles[fileIdx];
+        RAF::FileListEntry_t entry;
+        entry.mHash = file.hash;
+        entry.mOffset = file.offset;
+        entry.mSize = file.size;
+
+        // TODO: Dont use this, create a list of the archivenames, sort it, map index.
+        entry.mFileNameStringTableIndex = fileIdx;
+        fwrite(&entry, sizeof(entry), 1, outFile);
+    }
+
+    auto stringListOffset = ftell(outFile);
+    StringTable::HEADER slHeader;
+    slHeader.m_Size = 0;
+    slHeader.m_Count = (unsigned int) newArchiveFiles.size();
+    fwrite(&slHeader, sizeof(slHeader), 1, outFile);
+
+    auto totalSize = sizeof(slHeader) + sizeof(StringTable::ENTRY) * newArchiveFiles.size();
+    for (const auto& file : newArchiveFiles) {
+        StringTable::ENTRY entry;
+        entry.m_Offset = (unsigned int) totalSize;
+        entry.m_Size = (unsigned int) file.archivePath.length() + 1;
+        fwrite(&entry, sizeof(entry), 1, outFile);
+        totalSize += entry.m_Size;
+    }
+    for (const auto& file : newArchiveFiles) {
+        fwrite(file.archivePath.c_str(), 1, file.archivePath.size(), outFile);
+        fwrite("\0", 1, 1, outFile); // heh string is \0\0 lololol
+    }
+
+    slHeader.m_Size = (unsigned int) totalSize;
+    fseek(outFile, stringListOffset, SEEK_SET);
+    fwrite(&slHeader, sizeof(slHeader), 1, outFile);
+
+    fseek(outFile, sizeof(RAF::Header_t), SEEK_SET);
+    RAF::TableOfContents_t newToc;
+    newToc.mMgrIndex = 0;
+    newToc.mFileListOffset = fileHeaderOffset;
+    newToc.mStringTableOffset = stringListOffset;
+    fwrite(&newToc, sizeof(newToc), 1, outFile);
+
+    fclose(archiveOut);
+    fclose(outFile);
+
+    // Because path is reset in dispose
+    auto origPath = path;
+    dispose();
+
+    //rename(origPath, origPath + ".old");
+    //rename(origPath + ".dat", origPath + ".old.dat");
+
+    rename(origPath +".tmp", origPath);
+    rename(origPath +".tmp.dat", origPath + ".dat");
+
+    addList.clear();
+    removeList.clear();
+
+    load(origPath);
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 RiotArchiveFileCollection::RiotArchiveFileCollection(bool buildIndex) : buildIndex(buildIndex) {
@@ -387,3 +675,4 @@ void RiotArchiveFileCollection::addArchive(const std::string& path) {
     archives.push_back(archive);
     archivesNamed[path] = archive;
 }
+

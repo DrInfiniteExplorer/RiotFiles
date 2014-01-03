@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <map>
+#include <set>
 
 //#include "MMFile.h"
 
@@ -109,6 +110,8 @@ class RiotArchiveFile
     std::unique_ptr<MMFile> directoryFile;
     mutable std::unique_ptr<MMFile> archiveFile;
 
+    void openArchive() const;
+
     RAF::Header_t* header;
     RAF::TableOfContents_t* TOC;
     RAF::FileListHeader_t* fileListHeader;
@@ -142,6 +145,7 @@ public:
 
     virtual bool hasFile(const std::string& path) const;
     virtual size_t getFileIndex(const std::string& path) const;
+    virtual size_t getFileSize(size_t fileIdx) const;
     virtual std::vector<char> getFileContents(size_t fileIdx) const;
 
     virtual void extractFile(size_t fileIdx, const std::string& outPath) const;
@@ -150,6 +154,34 @@ public:
 
 private:
     void load(const std::string& archivePath);
+
+private:
+    std::set<std::string> removeList;
+    struct AddInfo {
+        std::string sourcePath;
+        std::string archivePath;
+    };
+    std::map<std::string, AddInfo> addList;
+
+    struct NewFileEntry {
+        NewFileEntry(std::string p) {
+            hash = RiotArchiveFile::hashString(p);
+            archivePath = p;
+        }
+        std::string archivePath;
+        unsigned int offset;
+        unsigned int size;
+        unsigned int hash;
+    };
+
+    static std::string sanitize(const std::string& path);
+public:
+    static unsigned int hashString(std::string str);
+    void apply();
+    void discard();
+
+    void addFile(const std::string& archivePath, const std::string& filePath);
+    void removeFile(const std::string& archivePath);
 };
 
 
@@ -181,3 +213,4 @@ public:
     
     //void addArchive(RiotArchiveFile* archive); // Not implemented, not sure about how to handle ownership.
 };
+
