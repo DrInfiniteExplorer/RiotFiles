@@ -272,8 +272,8 @@ void RiotArchiveFile::unpackArchive(const std::string& outPath) const {
 std::string RiotArchiveFile::sanitize(const std::string& _path) {
     auto path = _path;
     std::replace(path.begin(), path.end(), '\\', '/');
-    if (path[0] == '/') return path;
-    return "/" + path;
+    if (path[0] == '/') return path.substr(1);
+    return path;
 }
 
 unsigned int RiotArchiveFile::hashString(std::string str) {
