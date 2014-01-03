@@ -19,9 +19,11 @@ MMFile::MMFile(const std::string &path, MMOpenMode mode, size_t sizeToMap)
     fileSize = sizeToMap;
     MMFenforce(fileSize, std::string("File is of 0 size, cant map that! ") + path);
 
+    DWORD sizeHigh = (fileSize >> 32) & 0xFFFFFFFF;
+    DWORD sizeLow  = (fileSize      ) & 0xFFFFFFFF;
     auto protectMode = mode == read ? PAGE_READONLY : PAGE_READWRITE;
-    mapHandle = CreateFileMapping(fileHandle, NULL, protectMode, 0, 0, NULL);
-    MMFenforce(mapHandle != NULL, "Could not create file mapping");
+    mapHandle = CreateFileMapping(fileHandle, NULL, protectMode, sizeHigh, sizeLow, NULL);
+    MMFenforce(mapHandle != NULL, "Could not create file mapping for file " + path);
     auto mapAccess = mode == read ? FILE_MAP_READ : FILE_MAP_WRITE;
     ptr = MapViewOfFileEx(mapHandle, mapAccess, 0, 0, fileSize, NULL);
     MMFenforce(ptr != NULL, "Could not map view of file");
