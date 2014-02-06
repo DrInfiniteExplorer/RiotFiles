@@ -173,8 +173,8 @@ bool RiotArchiveFile::hasFile(const std::string& _path) const {
 }
 
 size_t RiotArchiveFile::getFileIndex(const std::string& _path) const {
-    // Can probably be accellerated by grabbing hash of path, looking
-    // in the fileheader until a match is found and then
+    // Can probably be accelerated by grabbing hash of path, looking
+    // in the file header until a match is found and then
     // linearly search until found
     auto path = sanitize(_path);
     for (size_t i = 0; i < fileListHeader->mCount; i++) {
